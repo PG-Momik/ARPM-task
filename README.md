@@ -260,27 +260,56 @@ Key difference: Context handles execution-specific data; Cache provides persiste
 
 ## C) Update Method Differences:
 
-**`$query->update()`**:
-```php
-User::where('status', 'inactive')->update(['status' => 'active']);
-```
-- Query builder method for bulk updates
-- Bypasses model events and observers
-- Optimal for mass operations
+These three methods all perform updates but have different behaviors and use cases:
 
-**`$model->update()`**:
-```php
-$user = User::find(1);
-$user->update(['email' => 'new@example.com']);
-```
-- Instance method triggering `updating`/`updated` events
-- Executes observers, mutators, and model logic
-- Best for single-record updates requiring full model lifecycle
+## 1. `$query->update()`
+- **What it does**: Performs a direct database update without loading any models
+- **Characteristics**:
+   - Operates at the query builder level
+   - Bypasses model events (no `updating`/`updated` events fired)
+   - Doesn't update timestamps automatically
+   - Doesn't perform model validation
+   - More efficient for bulk updates
 
-**`$model->updateQuietly()`**:
-```php
-$user = User::find(1);
-$user->updateQuietly(['email' => 'silent@example.com']);
-```
-- Instance method suppressing all events and observers
-- Useful when avoiding side effects like logging or notifications
+- **When we need to use it**:
+   - Update many records efficiently
+   - Skip model events or mutators/accessors
+   - Example:
+     ```php
+     User::where('active', 1)->update(['status' => 'verified']);
+     ```  
+
+## 2. `$model->update()`
+- **What it does**: Updates a single model instance
+- **Characteristics**:
+   - Fires model events (`updating`/`updated`)
+   - Updates timestamps automatically
+   - Runs mutators/accessors
+   - Performs mass assignment protection
+   - Executes model validation if configured
+
+- **When we need to use it**:
+   - Update a single model with full Laravel features
+   - Ensure model events or mutators are applied
+   - Example:
+     ```php
+     $user = User::find(1);
+     $user->update(['name' => 'John Doe']);
+     ```  
+
+## 3. `$model->updateQuietly()`
+- **What it does**: Updates a model without firing events
+- **Characteristics**:
+   - Similar to `update()` but skips model events
+   - Still updates timestamps
+   - Still runs mutators/accessors
+   - Added in Laravel 8.x as a convenience method
+
+- **When we need to use it**:
+   - Update a model silently (without triggering events)
+   - Avoid observer side effects
+   - Example:
+     ```php
+     $user = User::find(1);
+     $user->updateQuietly(['name' => 'John Doe']);
+     ```
