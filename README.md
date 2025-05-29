@@ -84,19 +84,19 @@ Fresh laravel repo with all task related to ARPM task.
 
 5. Laravel Collection Methods
   - Change: Replaced manual loops with collection methods like map, sum, count, and sortByDesc.
-  - Reason: Improves code clarity, leverages expressive and chainable Laravel features for better maintainability.
+  - Reason: Improves code clarity. Plus I like using collections.
 
 6. Centralized Error Handling
   - Change: Wrapped logic in a try-catch block and added error logging.
-  - Reason: Ensures exceptions are caught and logged while gracefully handling failures via a fallback error view.
+  - Reason: Ensures exceptions handled and a 500 error page is shown.
 
 7. Simplified Sorting
   - Change: Replaced nested usort() calls with sortByDesc() on a collection.
-  - Reason: Cleaner and more readable sorting by completed_at using Laravel’s built-in collection methods.
+  - Reason: Cleaner and more readable sorting by completed_at using laravels built-in collection methods.
 
 8. Use of Arr Helper
   - Change: Used Arr::get and Arr::has to safely access nested array values.
-  - Reason: Improves readability and ensures safe data access with default fallbacks.
+  - Reason: Improves readability and ensures safe data access. This is just standard practice and I thought why not.
 
 9. Improved Code Readability
   - Change: Clear variable naming, logical grouping of data operations, and concise formatting.
@@ -211,7 +211,7 @@ print_r($output);
 
 ## Explanation:
 - Group offices by city.
-- For each city, gather the employee names living in that city.
+- For each city, it gathers the employee names living in that city.
 - Map every office under that city to the same employee list.
 - Convert the collection to a plain array with all().
 
@@ -229,26 +229,23 @@ Schedule::command('app:example-command')
 ->runInBackground();
 ```
 
-This Laravel scheduler configuration defines an Artisan command execution with specific constraints:
-
-- `Schedule::command('app:example-command')`: Registers the Artisan command for scheduling
-- `->withoutOverlapping()`: Prevents concurrent executions - skips new runs if previous is still active
+This Laravel cronjob/scheduled job does the following:
+- `Schedule::command('app:example-command')`: Registers Artisan command for scheduling
+- `->withoutOverlapping()`: Prevents concurrent executions - ignores newer runs if previous is still being processed
 - `->hourly()`: Executes every hour
-- `->onOneServer()`: Restricts execution to single server in multi-server environments (requires shared cache like Redis)
-- `->runInBackground()`: Executes asynchronously without blocking other scheduled tasks
-
-Ideal for resource-intensive operations like data processing, report generation, or queue management.
+- `->onOneServer()`: Restricts execution to single server in multi-server environments. I've never used this one irl.
+- `->runInBackground()`: Basically runs it in the background and executes it asynchronously without blocking other scheduled tasks. Good for resource intensive operations like data processing, report generation, or queue management.
 
 ## B) Context vs Cache Facades:
 
-**Context Facade** (typically custom/package-based):
+**Context Facade**:
 ```php
 $userId = Context::get('current_user_id');
 ```
 - Manages request-scoped or tenant-specific data
 - Provides contextual information for current execution
 
-**Cache Facade** (Laravel core):
+**Cache Facade**:
 ```php
 Cache::put('user_1', ['name' => 'John'], 3600);
 $data = Cache::get('user_1');
@@ -256,31 +253,58 @@ $data = Cache::get('user_1');
 - Stores data across requests for performance optimization
 - Uses backends like Redis, Memcached, or file storage
 
-Key difference: Context handles execution-specific data; Cache provides persistent storage for performance.
+Key difference is that context handles execution-specific data whereas cache provides persistent storage for performance. This is what i understood using chatgpt.
 
 ## C) Update Method Differences:
 
-**`$query->update()`**:
-```php
-User::where('status', 'inactive')->update(['status' => 'active']);
-```
-- Query builder method for bulk updates
-- Bypasses model events and observers
-- Optimal for mass operations
+Basically all these three methods all perform updates but have different behaviors and use cases:
 
-**`$model->update()`**:
-```php
-$user = User::find(1);
-$user->update(['email' => 'new@example.com']);
-```
-- Instance method triggering `updating`/`updated` events
-- Executes observers, mutators, and model logic
-- Best for single-record updates requiring full model lifecycle
+## 1. `$query->update()`
+- **What it does**: Performs a direct database update without loading any models
+- **Characteristics**:
+   - Operates at the query builder level
+   - Bypasses model events (no `updating`/`updated` events fired) and doesnt update the timestamps
+   - More efficient for bulk updates, since we kinda update using the query builder and not model instance.
 
-**`$model->updateQuietly()`**:
-```php
-$user = User::find(1);
-$user->updateQuietly(['email' => 'silent@example.com']);
-```
-- Instance method suppressing all events and observers
-- Useful when avoiding side effects like logging or notifications
+- **When we need to use it**:
+   - Update many records efficiently
+   - Skip model events or mutators/accessors
+   - Example:
+     ```php
+     User::where('active', 1)->update(['status' => 'verified']);
+     ```  
+
+## 2. `$model->update()`
+- **What it does**: Updates a single model instance
+- **Characteristics**:
+   - Fires model events (`updating`/`updated`)
+   - Updates timestamps automatically
+   - Runs mutators/accessors
+   - Performs mass assignment protection
+   - Executes model validation if configured
+
+- **When we need to use it**:
+   - Update a single model with full Laravel features
+   - Ensure model events or mutators are applied
+   - Example:
+     ```php
+     $user = User::find(1);
+     $user->update(['name' => 'John Doe']);
+     ```  
+
+## 3. `$model->updateQuietly()`
+- **What it does**: Updates a model without firing events
+- **Characteristics**:
+   - Similar to `update()` but skips model events
+   - Updates timestamps as well
+   - Still runs mutators/accessors
+
+- **When we need to use it**:
+   - Update a model silently (without triggering events), bascially avoid observer and event listeners from executing when a model has been updated.
+   - I often use this when running custom commands to fix data related issues in the db without any weird effects from happening via observers.
+   - I use it with the `['timestamps'=> false]` when I need to avoid timestamps from updating.
+   - Example:
+     ```php
+     $user = User::find(1);
+     $user->updateQuietly(['name' => 'John Doe', 'timestamps'=>false]);
+     ```
