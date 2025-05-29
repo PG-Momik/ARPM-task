@@ -134,3 +134,153 @@ The tests cover the following scenarios:
 ![img.png](img.png)
 
 ---
+
+
+# Task Four Summary
+
+## Original Code: 
+```php
+<?php
+$employees = [
+    ['name' => 'John', 'city' => 'Dallas'],
+    ['name' => 'Jane', 'city' => 'Austin'],
+    ['name' => 'Jake', 'city' => 'Dallas'],
+    ['name' => 'Jill', 'city' => 'Dallas'],
+];
+
+$offices = [
+    ['office' => 'Dallas HQ', 'city' => 'Dallas'],
+    ['office' => 'Dallas South', 'city' => 'Dallas'],
+    ['office' => 'Austin Branch', 'city' => 'Austin'],
+];
+
+$output = [
+    "Dallas" => [
+        "Dallas HQ" => ["John", "Jake", "Jill"],
+        "Dallas South" => ["John", "Jake", "Jill"],
+    ],
+    "Austin" => [
+        "Austin Branch" => ["Jane"],
+    ],
+];
+
+```
+
+## Refactored Code:
+
+```php
+<?php
+declare(strict_types=1);
+
+use Illuminate\Support\Collection;
+
+$employees = collect([
+    ['name' => 'John', 'city' => 'Dallas'],
+    ['name' => 'Jane', 'city' => 'Austin'],
+    ['name' => 'Jake', 'city' => 'Dallas'],
+    ['name' => 'Jill', 'city' => 'Dallas'],
+]);
+
+$offices = collect([
+    ['office' => 'Dallas HQ', 'city' => 'Dallas'],
+    ['office' => 'Dallas South', 'city' => 'Dallas'],
+    ['office' => 'Austin Branch', 'city' => 'Austin'],
+]);
+
+$output = $offices
+    ->groupBy('city')               
+    ->mapWithKeys(function ($officesByCity, $city) use ($employees) {
+        $names = $employees
+            ->where('city', $city)
+            ->pluck('name')
+            ->values()
+            ->all();
+
+        return [
+            $city => $officesByCity
+                ->pluck('office')
+                ->mapWithKeys(fn($office) => [$office => $names])
+                ->all()
+        ];
+    })
+    ->all();
+
+print_r($output);
+```
+
+
+## Explanation:
+- Group offices by city.
+- For each city, gather the employee names living in that city.
+- Map every office under that city to the same employee list.
+- Convert the collection to a plain array with all().
+
+---
+
+# Task Five Summary
+
+## A) Code Explanation:
+
+```php
+Schedule::command('app:example-command')
+->withoutOverlapping()
+->hourly()
+->onOneServer()
+->runInBackground();
+```
+
+This Laravel scheduler configuration defines an Artisan command execution with specific constraints:
+
+- `Schedule::command('app:example-command')`: Registers the Artisan command for scheduling
+- `->withoutOverlapping()`: Prevents concurrent executions - skips new runs if previous is still active
+- `->hourly()`: Executes every hour
+- `->onOneServer()`: Restricts execution to single server in multi-server environments (requires shared cache like Redis)
+- `->runInBackground()`: Executes asynchronously without blocking other scheduled tasks
+
+Ideal for resource-intensive operations like data processing, report generation, or queue management.
+
+## B) Context vs Cache Facades:
+
+**Context Facade** (typically custom/package-based):
+```php
+$userId = Context::get('current_user_id');
+```
+- Manages request-scoped or tenant-specific data
+- Provides contextual information for current execution
+
+**Cache Facade** (Laravel core):
+```php
+Cache::put('user_1', ['name' => 'John'], 3600);
+$data = Cache::get('user_1');
+```
+- Stores data across requests for performance optimization
+- Uses backends like Redis, Memcached, or file storage
+
+Key difference: Context handles execution-specific data; Cache provides persistent storage for performance.
+
+## C) Update Method Differences:
+
+**`$query->update()`**:
+```php
+User::where('status', 'inactive')->update(['status' => 'active']);
+```
+- Query builder method for bulk updates
+- Bypasses model events and observers
+- Optimal for mass operations
+
+**`$model->update()`**:
+```php
+$user = User::find(1);
+$user->update(['email' => 'new@example.com']);
+```
+- Instance method triggering `updating`/`updated` events
+- Executes observers, mutators, and model logic
+- Best for single-record updates requiring full model lifecycle
+
+**`$model->updateQuietly()`**:
+```php
+$user = User::find(1);
+$user->updateQuietly(['email' => 'silent@example.com']);
+```
+- Instance method suppressing all events and observers
+- Useful when avoiding side effects like logging or notifications
